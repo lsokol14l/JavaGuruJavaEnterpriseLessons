@@ -24,7 +24,7 @@ public class HttpClientRunner {
         HttpRequest.newBuilder()
             .uri(URI.create("http://localhost:8082"))
             .header("content-type", "application/json")
-            .POST(ofFile(Path.of("src/main/resources/request.json")))
+            .POST(ofFile(Path.of("src/main/resources/example.json")))
             .build();
 
     var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
