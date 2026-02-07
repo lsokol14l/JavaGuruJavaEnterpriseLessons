@@ -5,18 +5,19 @@ import by.michael.spring.dto.UserDto;
 import by.michael.spring.ioc.Container;
 import by.michael.spring.mapper.UserMapper;
 import by.michael.spring.service.UserService;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+import java.util.concurrent.TimeUnit;
 
 public class SpringRunner {
   public static void main(String[] args) {
-    //    UserDto userDto = new UserDto();
-    //    UserMapper userMapper = new UserMapper(userDto);
-    //    UserRepository userRepository = new UserRepository();
+    var context = new ClassPathXmlApplicationContext("application.xml");
+    var repo1 = context.getBean("repo1");
+    var repo2 = context.getBean("repo2");
+    System.out.println(repo1);
+    System.out.println(repo2);
 
-    //    UserService userService = new UserService(userMapper, userRepository);
-
-    Container container = new Container();
-    // Наш контейнер в методе get проанализирует наш класс, увидит 2 поля, найдет объекты этих
-    // классов, их заsetит сам в UserService и отдаст нам сразу бин с проинициализированными полями
-    UserService userService = container.get(UserService.class);
+    var userService = context.getBean(UserService.class);
+    System.out.println(userService);
   }
 }

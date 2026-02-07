@@ -10,6 +10,9 @@ repositories {
 }
 
 dependencies {
+    implementation("org.springframework:spring-core:7.0.3")
+    implementation("org.springframework:spring-context:7.0.3")
+
     compileOnly("org.projectlombok:lombok:1.18.42")
     annotationProcessor("org.projectlombok:lombok:1.18.42")
 
