@@ -16,19 +16,26 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalInt;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class HttpServer {
   private final int port;
+  private final ExecutorService pool;
 
-  public HttpServer(int port) {
+  public HttpServer(int port, int nThreads) {
     this.port = port;
+    pool = Executors.newFixedThreadPool(nThreads);
   }
 
   public void run() {
     try {
       var serverSocket = new ServerSocket(port);
-      var socket = serverSocket.accept();
-      processSocket(socket);
+      while (true) {
+        var socket = serverSocket.accept();
+        System.out.println("SocketAccepted");
+        pool.submit(() -> processSocket(socket));
+      }
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -40,6 +47,8 @@ public class HttpServer {
             new BufferedReader(new InputStreamReader(socket.getInputStream()));
         var outputStream = new DataOutputStream(socket.getOutputStream())) {
       // 1) Сначала обработаем запрос клиента
+      // чуть поспим типо процесс долгий обрабатывается
+      Thread.sleep(1000);
 
       // 1.1 прочитаем headers (заголовки запроса)
       List<String> headers = new ArrayList<>();
@@ -78,7 +87,7 @@ public class HttpServer {
       // перевод на новую строку
       outputStream.write(System.lineSeparator().getBytes());
       outputStream.write(body);
-    } catch (IOException e) {
+    } catch (IOException | InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
