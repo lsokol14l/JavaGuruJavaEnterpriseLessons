@@ -6,13 +6,12 @@ import by.michael.jdbc.exception.DaoException;
 import by.michael.jdbc.utils.ConnectionManager;
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class TicketDao implements Dao<Long, Ticket> {
   private static final TicketDao INSTANCE = new TicketDao();
+  private final FlightDao flightDao = FlightDao.getInstance();
 
   private static String SAVE_SQL =
       """
@@ -45,6 +44,22 @@ public class TicketDao implements Dao<Long, Ticket> {
               where id = ?
               """;
 
+  private static final String FIND_MOST_POPULAR_PASSENGER_NAMES =
+      """
+              select lower(left(passenger_name, position(' ' in passenger_name) - 1)) as name, count(*) as qty
+              from ticket
+              group by lower(left(passenger_name, position(' ' in passenger_name) - 1))
+              order by qty desc
+              limit 10
+              """;
+
+  private static final String FIND_PASSENGER_NAME_AND_TICKET_COUNT =
+      """
+              select lower(left(passenger_name, position(' ' in passenger_name ) - 1)) name, count(1) count
+              from ticket
+              group by passenger_name
+            """;
+
   private TicketDao() {}
 
   public static TicketDao getInstance() {
@@ -56,7 +71,7 @@ public class TicketDao implements Dao<Long, Ticket> {
         PreparedStatement pst = connection.prepareStatement(UPDATE_SQL)) {
       pst.setString(1, ticket.getPassportNo());
       pst.setString(2, ticket.getPassengerName());
-      pst.setLong(3, ticket.getFlightId());
+      pst.setLong(3, ticket.getFlight().getId());
       pst.setString(4, ticket.getSeatNo());
       pst.setBigDecimal(5, ticket.getCost());
       pst.setLong(6, ticket.getId());
@@ -83,12 +98,14 @@ public class TicketDao implements Dao<Long, Ticket> {
     }
   }
 
-  private static Ticket buildTicket(ResultSet resultSet) throws SQLException {
+  private Ticket buildTicket(ResultSet resultSet) throws SQLException {
     return new Ticket(
         resultSet.getLong("id"),
         resultSet.getString("passport_no"),
         resultSet.getString("passenger_name"),
-        resultSet.getLong("flight_id"),
+        flightDao
+            .findById(resultSet.getLong("flight_id"), resultSet.getStatement().getConnection())
+            .orElse(null),
         resultSet.getString("seat_no"),
         resultSet.getBigDecimal("cost"));
   }
@@ -148,7 +165,7 @@ public class TicketDao implements Dao<Long, Ticket> {
         var pst = connection.prepareStatement(SAVE_SQL, Statement.RETURN_GENERATED_KEYS)) {
       pst.setString(1, ticket.getPassportNo());
       pst.setString(2, ticket.getPassengerName());
-      pst.setLong(3, ticket.getFlightId());
+      pst.setLong(3, ticket.getFlight().getId());
       pst.setString(4, ticket.getSeatNo());
       pst.setBigDecimal(5, ticket.getCost());
 
@@ -170,6 +187,56 @@ public class TicketDao implements Dao<Long, Ticket> {
       pst.setLong(1, id);
 
       return pst.executeUpdate() > 0;
+    } catch (SQLException e) {
+      throw new DaoException(e);
+    }
+  }
+
+  public List<String> findMostPopularPassengerNames() {
+    try (Connection connection = ConnectionManager.get();
+        PreparedStatement pst = connection.prepareStatement(FIND_MOST_POPULAR_PASSENGER_NAMES)) {
+      List<String> names = new ArrayList<>();
+
+      ResultSet resultSet = pst.executeQuery();
+
+      while (resultSet.next()) {
+        String passengerName = resultSet.getString("name");
+        String formattedName = "";
+        if (passengerName != null) {
+          formattedName =
+              passengerName.substring(0, 1).toUpperCase()
+                  + (passengerName.length() > 1 ? passengerName.substring(1).toLowerCase() : "");
+        }
+        names.add(formattedName);
+      }
+      return names;
+    } catch (SQLException e) {
+      throw new DaoException(e);
+    }
+  }
+
+  public Map<String, Long> findPassengerNameAndTicketCount() {
+    try (var connection = ConnectionManager.get();
+        PreparedStatement pst =
+            connection.prepareStatement(FIND_PASSENGER_NAME_AND_TICKET_COUNT); ) {
+      ResultSet resultSet = pst.executeQuery();
+
+      Map<String, Long> result = new HashMap<>();
+
+      while (resultSet.next()) {
+        String passengerName = resultSet.getString("name");
+        String formattedName = "";
+        if (passengerName != null) {
+          formattedName =
+              passengerName.substring(0, 1).toUpperCase()
+                  + (passengerName.length() > 1 ? passengerName.substring(1).toLowerCase() : "");
+        }
+        long count = resultSet.getLong("count");
+
+        result.put(formattedName, count);
+      }
+
+      return result;
     } catch (SQLException e) {
       throw new DaoException(e);
     }

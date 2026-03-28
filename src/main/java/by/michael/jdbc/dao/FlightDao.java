@@ -30,12 +30,7 @@ public class FlightDao implements Dao<Long, Flight> {
                           status = ?
                           where id = ?
         """;
-  private static final String FIND_BY_ID_SQL =
-      """
-          select id, flight_no, departure_date, departure_airport_code, arrival_date, arrival_airport_code, aircraft_id, status
-          from flight
-          where id=?
-        """;
+
   private static final String FIND_ALL_SQL =
       """
             select id,
@@ -46,6 +41,12 @@ public class FlightDao implements Dao<Long, Flight> {
                    arrival_airport_code,
                    aircraft_id,
                    status from flight
+          """;
+
+  private static final String FIND_BY_ID_SQL =
+      FIND_ALL_SQL
+          + """
+          where id = ?
           """;
 
   private static final String DELETE_SQL =
@@ -90,14 +91,8 @@ public class FlightDao implements Dao<Long, Flight> {
 
   @Override
   public Optional<Flight> findById(Long id) {
-    try (Connection connection = ConnectionManager.get();
-        PreparedStatement pst = connection.prepareStatement(FIND_BY_ID_SQL)) {
-      pst.setLong(1, id);
-      ResultSet resultSet = pst.executeQuery();
-      Flight flight = null;
-      if (resultSet.next()) flight = buildFlight(resultSet);
-
-      return Optional.ofNullable(flight);
+    try (Connection connection = ConnectionManager.get(); ) {
+      return findById(id, connection);
     } catch (SQLException e) {
       throw new DaoException(e);
     }
@@ -161,6 +156,19 @@ public class FlightDao implements Dao<Long, Flight> {
       return result > 0;
     } catch (SQLException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  public Optional<Flight> findById(Long id, Connection connection) {
+    try (var pst = connection.prepareStatement(FIND_BY_ID_SQL)) {
+      pst.setLong(1, id);
+      ResultSet resultSet = pst.executeQuery();
+      Flight flight = null;
+      if (resultSet.next()) flight = buildFlight(resultSet);
+
+      return Optional.ofNullable(flight);
+    } catch (SQLException e) {
+      throw new DaoException(e);
     }
   }
 }
